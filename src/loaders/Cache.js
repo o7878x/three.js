@@ -1,10 +1,4 @@
-var Cache;
-
-/**
- * @author mrdoob / http://mrdoob.com/
- */
-
-Cache = {
+const Cache = {
 
 	enabled: false,
 

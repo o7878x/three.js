@@ -1,12 +1,12 @@
-import { Vector4 } from '../../math/Vector4';
-import { Color } from '../../math/Color';
-import { Vector2 } from '../../math/Vector2';
+import { Color } from '../../math/Color.js';
+import { Vector2 } from '../../math/Vector2.js';
+import { Matrix3 } from '../../math/Matrix3.js';
 
 /**
  * Uniforms library for shared webgl shaders
  */
 
-var UniformsLib = {
+const UniformsLib = {
 
 	common: {
 
@@ -14,15 +14,26 @@ var UniformsLib = {
 		opacity: { value: 1.0 },
 
 		map: { value: null },
-		offsetRepeat: { value: new Vector4( 0, 0, 1, 1 ) },
+		uvTransform: { value: new Matrix3() },
+		uv2Transform: { value: new Matrix3() },
+
+		alphaMap: { value: null },
+
+	},
+
+	specularmap: {
 
 		specularMap: { value: null },
-		alphaMap: { value: null },
+
+	},
+
+	envmap: {
 
 		envMap: { value: null },
 		flipEnvMap: { value: - 1 },
 		reflectivity: { value: 1.0 },
-		refractionRatio: { value: 0.98 }
+		refractionRatio: { value: 0.98 },
+		maxMipLevel: { value: 0 }
 
 	},
 
@@ -80,6 +91,12 @@ var UniformsLib = {
 
 	},
 
+	gradientmap: {
+
+		gradientMap: { value: null }
+
+	},
+
 	fog: {
 
 		fogDensity: { value: 0.00025 },
@@ -93,12 +110,16 @@ var UniformsLib = {
 
 		ambientLightColor: { value: [] },
 
+		lightProbe: { value: [] },
+
 		directionalLights: { value: [], properties: {
 			direction: {},
-			color: {},
+			color: {}
+		} },
 
-			shadow: {},
+		directionalLightShadows: { value: [], properties: {
 			shadowBias: {},
+			shadowNormalBias: {},
 			shadowRadius: {},
 			shadowMapSize: {}
 		} },
@@ -113,10 +134,12 @@ var UniformsLib = {
 			distance: {},
 			coneCos: {},
 			penumbraCos: {},
-			decay: {},
+			decay: {}
+		} },
 
-			shadow: {},
+		spotLightShadows: { value: [], properties: {
 			shadowBias: {},
+			shadowNormalBias: {},
 			shadowRadius: {},
 			shadowMapSize: {}
 		} },
@@ -128,12 +151,16 @@ var UniformsLib = {
 			color: {},
 			position: {},
 			decay: {},
-			distance: {},
+			distance: {}
+		} },
 
-			shadow: {},
+		pointLightShadows: { value: [], properties: {
 			shadowBias: {},
+			shadowNormalBias: {},
 			shadowRadius: {},
-			shadowMapSize: {}
+			shadowMapSize: {},
+			shadowCameraNear: {},
+			shadowCameraFar: {}
 		} },
 
 		pointShadowMap: { value: [] },
@@ -143,7 +170,18 @@ var UniformsLib = {
 			direction: {},
 			skyColor: {},
 			groundColor: {}
-		} }
+		} },
+
+		// TODO (abelnation): RectAreaLight BRDF data needs to be moved from example to main src
+		rectAreaLights: { value: [], properties: {
+			color: {},
+			position: {},
+			width: {},
+			height: {}
+		} },
+
+		ltc_1: { value: null },
+		ltc_2: { value: null }
 
 	},
 
@@ -154,11 +192,23 @@ var UniformsLib = {
 		size: { value: 1.0 },
 		scale: { value: 1.0 },
 		map: { value: null },
-		offsetRepeat: { value: new Vector4( 0, 0, 1, 1 ) }
+		alphaMap: { value: null },
+		uvTransform: { value: new Matrix3() }
+
+	},
+
+	sprite: {
+
+		diffuse: { value: new Color( 0xeeeeee ) },
+		opacity: { value: 1.0 },
+		center: { value: new Vector2( 0.5, 0.5 ) },
+		rotation: { value: 0.0 },
+		map: { value: null },
+		alphaMap: { value: null },
+		uvTransform: { value: new Matrix3() }
 
 	}
 
 };
-
 
 export { UniformsLib };

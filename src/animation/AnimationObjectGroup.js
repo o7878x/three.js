@@ -1,5 +1,5 @@
-import { PropertyBinding } from './PropertyBinding';
-import { _Math } from '../math/Math';
+import { PropertyBinding } from './PropertyBinding.js';
+import { MathUtils } from '../math/MathUtils.js';
 
 /**
  *
@@ -7,92 +7,101 @@ import { _Math } from '../math/Math';
  *
  * Usage:
  *
- * 	-	Add objects you would otherwise pass as 'root' to the
- * 		constructor or the .clipAction method of AnimationMixer.
+ *  - Add objects you would otherwise pass as 'root' to the
+ *    constructor or the .clipAction method of AnimationMixer.
  *
- * 	-	Instead pass this object as 'root'.
+ *  - Instead pass this object as 'root'.
  *
- * 	-	You can also add and remove objects later when the mixer
- * 		is running.
+ *  - You can also add and remove objects later when the mixer
+ *    is running.
  *
  * Note:
  *
- *  	Objects of this class appear as one object to the mixer,
- *  	so cache control of the individual objects must be done
- *  	on the group.
+ *    Objects of this class appear as one object to the mixer,
+ *    so cache control of the individual objects must be done
+ *    on the group.
  *
  * Limitation:
  *
- * 	- 	The animated properties must be compatible among the
- * 		all objects in the group.
+ *  - The animated properties must be compatible among the
+ *    all objects in the group.
  *
- *  -	A single property can either be controlled through a
- *  	target group or directly, but not both.
- *
- * @author tschw
+ *  - A single property can either be controlled through a
+ *    target group or directly, but not both.
  */
 
-function AnimationObjectGroup( var_args ) {
+function AnimationObjectGroup() {
 
-	this.uuid = _Math.generateUUID();
+	this.uuid = MathUtils.generateUUID();
 
 	// cached objects followed by the active ones
 	this._objects = Array.prototype.slice.call( arguments );
 
-	this.nCachedObjects_ = 0;			// threshold
+	this.nCachedObjects_ = 0; // threshold
 	// note: read by PropertyBinding.Composite
 
-	var indices = {};
-	this._indicesByUUID = indices;		// for bookkeeping
+	const indices = {};
+	this._indicesByUUID = indices; // for bookkeeping
 
-	for ( var i = 0, n = arguments.length; i !== n; ++ i ) {
+	for ( let i = 0, n = arguments.length; i !== n; ++ i ) {
 
 		indices[ arguments[ i ].uuid ] = i;
 
 	}
 
-	this._paths = [];					// inside: string
-	this._parsedPaths = [];				// inside: { we don't care, here }
-	this._bindings = []; 				// inside: Array< PropertyBinding >
-	this._bindingsIndicesByPath = {}; 	// inside: indices in these arrays
+	this._paths = []; // inside: string
+	this._parsedPaths = []; // inside: { we don't care, here }
+	this._bindings = []; // inside: Array< PropertyBinding >
+	this._bindingsIndicesByPath = {}; // inside: indices in these arrays
 
-	var scope = this;
+	const scope = this;
 
 	this.stats = {
 
 		objects: {
-			get total() { return scope._objects.length; },
-			get inUse() { return this.total - scope.nCachedObjects_;  }
-		},
+			get total() {
 
-		get bindingsPerObject() { return scope._bindings.length; }
+				return scope._objects.length;
+
+			},
+			get inUse() {
+
+				return this.total - scope.nCachedObjects_;
+
+			}
+		},
+		get bindingsPerObject() {
+
+			return scope._bindings.length;
+
+		}
 
 	};
 
 }
 
-AnimationObjectGroup.prototype = {
-
-	constructor: AnimationObjectGroup,
+Object.assign( AnimationObjectGroup.prototype, {
 
 	isAnimationObjectGroup: true,
 
-	add: function( var_args ) {
+	add: function () {
 
-		var objects = this._objects,
-			nObjects = objects.length,
-			nCachedObjects = this.nCachedObjects_,
+		const objects = this._objects,
 			indicesByUUID = this._indicesByUUID,
 			paths = this._paths,
 			parsedPaths = this._parsedPaths,
 			bindings = this._bindings,
 			nBindings = bindings.length;
 
-		for ( var i = 0, n = arguments.length; i !== n; ++ i ) {
+		let knownObject = undefined,
+			nObjects = objects.length,
+			nCachedObjects = this.nCachedObjects_;
 
-			var object = arguments[ i ],
-				uuid = object.uuid,
-				index = indicesByUUID[ uuid ];
+		for ( let i = 0, n = arguments.length; i !== n; ++ i ) {
+
+			const object = arguments[ i ],
+				uuid = object.uuid;
+			let index = indicesByUUID[ uuid ];
 
 			if ( index === undefined ) {
 
@@ -104,21 +113,19 @@ AnimationObjectGroup.prototype = {
 
 				// accounting is done, now do the same for all bindings
 
-				for ( var j = 0, m = nBindings; j !== m; ++ j ) {
+				for ( let j = 0, m = nBindings; j !== m; ++ j ) {
 
-					bindings[ j ].push(
-							new PropertyBinding(
-								object, paths[ j ], parsedPaths[ j ] ) );
+					bindings[ j ].push( new PropertyBinding( object, paths[ j ], parsedPaths[ j ] ) );
 
 				}
 
 			} else if ( index < nCachedObjects ) {
 
-				var knownObject = objects[ index ];
+				knownObject = objects[ index ];
 
 				// move existing object to the ACTIVE region
 
-				var firstActiveIndex = -- nCachedObjects,
+				const firstActiveIndex = -- nCachedObjects,
 					lastCachedObject = objects[ firstActiveIndex ];
 
 				indicesByUUID[ lastCachedObject.uuid ] = index;
@@ -129,11 +136,12 @@ AnimationObjectGroup.prototype = {
 
 				// accounting is done, now do the same for all bindings
 
-				for ( var j = 0, m = nBindings; j !== m; ++ j ) {
+				for ( let j = 0, m = nBindings; j !== m; ++ j ) {
 
-					var bindingsForPath = bindings[ j ],
-						lastCached = bindingsForPath[ firstActiveIndex ],
-						binding = bindingsForPath[ index ];
+					const bindingsForPath = bindings[ j ],
+						lastCached = bindingsForPath[ firstActiveIndex ];
+
+					let binding = bindingsForPath[ index ];
 
 					bindingsForPath[ index ] = lastCached;
 
@@ -143,8 +151,7 @@ AnimationObjectGroup.prototype = {
 						// for objects that are cached, the binding may
 						// or may not exist
 
-						binding = new PropertyBinding(
-								object, paths[ j ], parsedPaths[ j ] );
+						binding = new PropertyBinding( object, paths[ j ], parsedPaths[ j ] );
 
 					}
 
@@ -152,11 +159,10 @@ AnimationObjectGroup.prototype = {
 
 				}
 
-			} else if ( objects[ index ] !== knownObject) {
+			} else if ( objects[ index ] !== knownObject ) {
 
-				console.error( "Different objects with the same UUID " +
-						"detected. Clean the caches or recreate your " +
-						"infrastructure when reloading scenes..." );
+				console.error( 'THREE.AnimationObjectGroup: Different objects with the same UUID ' +
+					'detected. Clean the caches or recreate your infrastructure when reloading scenes.' );
 
 			} // else the object is already where we want it to be
 
@@ -166,17 +172,18 @@ AnimationObjectGroup.prototype = {
 
 	},
 
-	remove: function( var_args ) {
+	remove: function () {
 
-		var objects = this._objects,
-			nCachedObjects = this.nCachedObjects_,
+		const objects = this._objects,
 			indicesByUUID = this._indicesByUUID,
 			bindings = this._bindings,
 			nBindings = bindings.length;
 
-		for ( var i = 0, n = arguments.length; i !== n; ++ i ) {
+		let nCachedObjects = this.nCachedObjects_;
 
-			var object = arguments[ i ],
+		for ( let i = 0, n = arguments.length; i !== n; ++ i ) {
+
+			const object = arguments[ i ],
 				uuid = object.uuid,
 				index = indicesByUUID[ uuid ];
 
@@ -184,7 +191,7 @@ AnimationObjectGroup.prototype = {
 
 				// move existing object into the CACHED region
 
-				var lastCachedIndex = nCachedObjects ++,
+				const lastCachedIndex = nCachedObjects ++,
 					firstActiveObject = objects[ lastCachedIndex ];
 
 				indicesByUUID[ firstActiveObject.uuid ] = index;
@@ -195,9 +202,9 @@ AnimationObjectGroup.prototype = {
 
 				// accounting is done, now do the same for all bindings
 
-				for ( var j = 0, m = nBindings; j !== m; ++ j ) {
+				for ( let j = 0, m = nBindings; j !== m; ++ j ) {
 
-					var bindingsForPath = bindings[ j ],
+					const bindingsForPath = bindings[ j ],
 						firstActive = bindingsForPath[ lastCachedIndex ],
 						binding = bindingsForPath[ index ];
 
@@ -215,18 +222,19 @@ AnimationObjectGroup.prototype = {
 	},
 
 	// remove & forget
-	uncache: function( var_args ) {
+	uncache: function () {
 
-		var objects = this._objects,
-			nObjects = objects.length,
-			nCachedObjects = this.nCachedObjects_,
+		const objects = this._objects,
 			indicesByUUID = this._indicesByUUID,
 			bindings = this._bindings,
 			nBindings = bindings.length;
 
-		for ( var i = 0, n = arguments.length; i !== n; ++ i ) {
+		let nCachedObjects = this.nCachedObjects_,
+			nObjects = objects.length;
 
-			var object = arguments[ i ],
+		for ( let i = 0, n = arguments.length; i !== n; ++ i ) {
+
+			const object = arguments[ i ],
 				uuid = object.uuid,
 				index = indicesByUUID[ uuid ];
 
@@ -238,7 +246,7 @@ AnimationObjectGroup.prototype = {
 
 					// object is cached, shrink the CACHED region
 
-					var firstActiveIndex = -- nCachedObjects,
+					const firstActiveIndex = -- nCachedObjects,
 						lastCachedObject = objects[ firstActiveIndex ],
 						lastIndex = -- nObjects,
 						lastObject = objects[ lastIndex ];
@@ -254,9 +262,9 @@ AnimationObjectGroup.prototype = {
 
 					// accounting is done, now do the same for all bindings
 
-					for ( var j = 0, m = nBindings; j !== m; ++ j ) {
+					for ( let j = 0, m = nBindings; j !== m; ++ j ) {
 
-						var bindingsForPath = bindings[ j ],
+						const bindingsForPath = bindings[ j ],
 							lastCached = bindingsForPath[ firstActiveIndex ],
 							last = bindingsForPath[ lastIndex ];
 
@@ -270,18 +278,23 @@ AnimationObjectGroup.prototype = {
 
 					// object is active, just swap with the last and pop
 
-					var lastIndex = -- nObjects,
+					const lastIndex = -- nObjects,
 						lastObject = objects[ lastIndex ];
 
-					indicesByUUID[ lastObject.uuid ] = index;
+					if ( lastIndex > 0 ) {
+
+						indicesByUUID[ lastObject.uuid ] = index;
+
+					}
+
 					objects[ index ] = lastObject;
 					objects.pop();
 
 					// accounting is done, now do the same for all bindings
 
-					for ( var j = 0, m = nBindings; j !== m; ++ j ) {
+					for ( let j = 0, m = nBindings; j !== m; ++ j ) {
 
-						var bindingsForPath = bindings[ j ];
+						const bindingsForPath = bindings[ j ];
 
 						bindingsForPath[ index ] = bindingsForPath[ lastIndex ];
 						bindingsForPath.pop();
@@ -300,17 +313,18 @@ AnimationObjectGroup.prototype = {
 
 	// Internal interface used by befriended PropertyBinding.Composite:
 
-	subscribe_: function( path, parsedPath ) {
+	subscribe_: function ( path, parsedPath ) {
+
 		// returns an array of bindings for the given path that is changed
 		// according to the contained objects in the group
 
-		var indicesByPath = this._bindingsIndicesByPath,
-			index = indicesByPath[ path ],
-			bindings = this._bindings;
+		const indicesByPath = this._bindingsIndicesByPath;
+		let index = indicesByPath[ path ];
+		const bindings = this._bindings;
 
 		if ( index !== undefined ) return bindings[ index ];
 
-		var paths = this._paths,
+		const paths = this._paths,
 			parsedPaths = this._parsedPaths,
 			objects = this._objects,
 			nObjects = objects.length,
@@ -325,13 +339,10 @@ AnimationObjectGroup.prototype = {
 		parsedPaths.push( parsedPath );
 		bindings.push( bindingsForPath );
 
-		for ( var i = nCachedObjects,
-				n = objects.length; i !== n; ++ i ) {
+		for ( let i = nCachedObjects, n = objects.length; i !== n; ++ i ) {
 
-			var object = objects[ i ];
-
-			bindingsForPath[ i ] =
-					new PropertyBinding( object, path, parsedPath );
+			const object = objects[ i ];
+			bindingsForPath[ i ] = new PropertyBinding( object, path, parsedPath );
 
 		}
 
@@ -339,16 +350,17 @@ AnimationObjectGroup.prototype = {
 
 	},
 
-	unsubscribe_: function( path ) {
+	unsubscribe_: function ( path ) {
+
 		// tells the group to forget about a property path and no longer
 		// update the array previously obtained with 'subscribe_'
 
-		var indicesByPath = this._bindingsIndicesByPath,
+		const indicesByPath = this._bindingsIndicesByPath,
 			index = indicesByPath[ path ];
 
 		if ( index !== undefined ) {
 
-			var paths = this._paths,
+			const paths = this._paths,
 				parsedPaths = this._parsedPaths,
 				bindings = this._bindings,
 				lastBindingsIndex = bindings.length - 1,
@@ -370,8 +382,7 @@ AnimationObjectGroup.prototype = {
 
 	}
 
-};
-
+} );
 
 
 export { AnimationObjectGroup };

@@ -1,98 +1,75 @@
-import { Matrix4 } from '../math/Matrix4';
-import { FloatType, RGBAFormat } from '../constants';
-import { DataTexture } from '../textures/DataTexture';
-import { _Math } from '../math/Math';
+import { Bone } from './Bone.js';
+import { Matrix4 } from '../math/Matrix4.js';
+import { MathUtils } from '../math/MathUtils.js';
 
-/**
- * @author mikael emtinger / http://gomo.se/
- * @author alteredq / http://alteredqualia.com/
- * @author michael guerrero / http://realitymeltdown.com
- * @author ikerr / http://verold.com
- */
+const _offsetMatrix = new Matrix4();
+const _identityMatrix = new Matrix4();
 
-function Skeleton( bones, boneInverses, useVertexTexture ) {
+function Skeleton( bones = [], boneInverses = [] ) {
 
-	this.useVertexTexture = useVertexTexture !== undefined ? useVertexTexture : true;
-
-	this.identityMatrix = new Matrix4();
-
-	// copy the bone array
-
-	bones = bones || [];
+	this.uuid = MathUtils.generateUUID();
 
 	this.bones = bones.slice( 0 );
+	this.boneInverses = boneInverses;
+	this.boneMatrices = null;
 
-	// create a bone texture or an array of floats
+	this.boneTexture = null;
+	this.boneTextureSize = 0;
 
-	if ( this.useVertexTexture ) {
+	this.frame = - 1;
 
-		// layout (1 matrix = 4 pixels)
-		//      RGBA RGBA RGBA RGBA (=> column1, column2, column3, column4)
-		//  with  8x8  pixel texture max   16 bones * 4 pixels =  (8 * 8)
-		//       16x16 pixel texture max   64 bones * 4 pixels = (16 * 16)
-		//       32x32 pixel texture max  256 bones * 4 pixels = (32 * 32)
-		//       64x64 pixel texture max 1024 bones * 4 pixels = (64 * 64)
-
-
-		var size = Math.sqrt( this.bones.length * 4 ); // 4 pixels needed for 1 matrix
-		size = _Math.nextPowerOfTwo( Math.ceil( size ) );
-		size = Math.max( size, 4 );
-
-		this.boneTextureWidth = size;
-		this.boneTextureHeight = size;
-
-		this.boneMatrices = new Float32Array( this.boneTextureWidth * this.boneTextureHeight * 4 ); // 4 floats per RGBA pixel
-		this.boneTexture = new DataTexture( this.boneMatrices, this.boneTextureWidth, this.boneTextureHeight, RGBAFormat, FloatType );
-
-	} else {
-
-		this.boneMatrices = new Float32Array( 16 * this.bones.length );
-
-	}
-
-	// use the supplied bone inverses or calculate the inverses
-
-	if ( boneInverses === undefined ) {
-
-		this.calculateInverses();
-
-	} else {
-
-		if ( this.bones.length === boneInverses.length ) {
-
-			this.boneInverses = boneInverses.slice( 0 );
-
-		} else {
-
-			console.warn( 'THREE.Skeleton bonInverses is the wrong length.' );
-
-			this.boneInverses = [];
-
-			for ( var b = 0, bl = this.bones.length; b < bl; b ++ ) {
-
-				this.boneInverses.push( new Matrix4() );
-
-			}
-
-		}
-
-	}
+	this.init();
 
 }
 
 Object.assign( Skeleton.prototype, {
 
+	init: function () {
+
+		const bones = this.bones;
+		const boneInverses = this.boneInverses;
+
+		this.boneMatrices = new Float32Array( bones.length * 16 );
+
+		// calculate inverse bone matrices if necessary
+
+		if ( boneInverses.length === 0 ) {
+
+			this.calculateInverses();
+
+		} else {
+
+			// handle special case
+
+			if ( bones.length !== boneInverses.length ) {
+
+				console.warn( 'THREE.Skeleton: Number of inverse bone matrices does not match amount of bones.' );
+
+				this.boneInverses = [];
+
+				for ( let i = 0, il = this.bones.length; i < il; i ++ ) {
+
+					this.boneInverses.push( new Matrix4() );
+
+				}
+
+			}
+
+		}
+
+	},
+
 	calculateInverses: function () {
 
-		this.boneInverses = [];
+		this.boneInverses.length = 0;
 
-		for ( var b = 0, bl = this.bones.length; b < bl; b ++ ) {
+		for ( let i = 0, il = this.bones.length; i < il; i ++ ) {
 
-			var inverse = new Matrix4();
+			const inverse = new Matrix4();
 
-			if ( this.bones[ b ] ) {
+			if ( this.bones[ i ] ) {
 
-				inverse.getInverse( this.bones[ b ].matrixWorld );
+				inverse.copy( this.bones[ i ].matrixWorld ).invert();
 
 			}
 
@@ -104,17 +81,15 @@ Object.assign( Skeleton.prototype, {
 
 	pose: function () {
 
-		var bone;
-
 		// recover the bind-time world matrices
 
-		for ( var b = 0, bl = this.bones.length; b < bl; b ++ ) {
+		for ( let i = 0, il = this.bones.length; i < il; i ++ ) {
 
-			bone = this.bones[ b ];
+			const bone = this.bones[ i ];
 
 			if ( bone ) {
 
-				bone.matrixWorld.getInverse( this.boneInverses[ b ] );
+				bone.matrixWorld.copy( this.boneInverses[ i ] ).invert();
 
 			}
 
@@ -122,15 +97,15 @@ Object.assign( Skeleton.prototype, {
 
 		// compute the local matrices, positions, rotations and scales
 
-		for ( var b = 0, bl = this.bones.length; b < bl; b ++ ) {
+		for ( let i = 0, il = this.bones.length; i < il; i ++ ) {
 
-			bone = this.bones[ b ];
+			const bone = this.bones[ i ];
 
 			if ( bone ) {
 
-				if ( (bone.parent && bone.parent.isBone) ) {
+				if ( bone.parent && bone.parent.isBone ) {
 
-					bone.matrix.getInverse( bone.parent.matrixWorld );
+					bone.matrix.copy( bone.parent.matrixWorld ).invert();
 					bone.matrix.multiply( bone.matrixWorld );
 
 				} else {
@@ -147,38 +122,125 @@ Object.assign( Skeleton.prototype, {
 
 	},
 
-	update: ( function () {
+	update: function () {
 
-		var offsetMatrix = new Matrix4();
+		const bones = this.bones;
+		const boneInverses = this.boneInverses;
+		const boneMatrices = this.boneMatrices;
+		const boneTexture = this.boneTexture;
 
-		return function update() {
+		// flatten bone matrices to array
 
-			// flatten bone matrices to array
+		for ( let i = 0, il = bones.length; i < il; i ++ ) {
 
-			for ( var b = 0, bl = this.bones.length; b < bl; b ++ ) {
+			// compute the offset between the current and the original transform
 
-				// compute the offset between the current and the original transform
+			const matrix = bones[ i ] ? bones[ i ].matrixWorld : _identityMatrix;
 
-				var matrix = this.bones[ b ] ? this.bones[ b ].matrixWorld : this.identityMatrix;
+			_offsetMatrix.multiplyMatrices( matrix, boneInverses[ i ] );
+			_offsetMatrix.toArray( boneMatrices, i * 16 );
 
-				offsetMatrix.multiplyMatrices( matrix, this.boneInverses[ b ] );
-				offsetMatrix.toArray( this.boneMatrices, b * 16 );
+		}
 
-			}
+		if ( boneTexture !== null ) {
 
-			if ( this.useVertexTexture ) {
+			boneTexture.needsUpdate = true;
 
-				this.boneTexture.needsUpdate = true;
+		}
 
-			}
-
-		};
-
-	} )(),
+	},
 
 	clone: function () {
 
-		return new Skeleton( this.bones, this.boneInverses, this.useVertexTexture );
+		return new Skeleton( this.bones, this.boneInverses );
+
+	},
+
+	getBoneByName: function ( name ) {
+
+		for ( let i = 0, il = this.bones.length; i < il; i ++ ) {
+
+			const bone = this.bones[ i ];
+
+			if ( bone.name === name ) {
+
+				return bone;
+
+			}
+
+		}
+
+		return undefined;
+
+	},
+
+	dispose: function ( ) {
+
+		if ( this.boneTexture !== null ) {
+
+			this.boneTexture.dispose();
+
+			this.boneTexture = null;
+
+		}
+
+	},
+
+	fromJSON: function ( json, bones ) {
+
+		this.uuid = json.uuid;
+
+		for ( let i = 0, l = json.bones.length; i < l; i ++ ) {
+
+			const uuid = json.bones[ i ];
+			let bone = bones[ uuid ];
+
+			if ( bone === undefined ) {
+
+				console.warn( 'THREE.Skeleton: No bone found with UUID:', uuid );
+				bone = new Bone();
+
+			}
+
+			this.bones.push( bone );
+			this.boneInverses.push( new Matrix4().fromArray( json.boneInverses[ i ] ) );
+
+		}
+
+		this.init();
+
+		return this;
+
+	},
+
+	toJSON: function () {
+
+		const data = {
+			metadata: {
+				version: 4.5,
+				type: 'Skeleton',
+				generator: 'Skeleton.toJSON'
+			},
+			bones: [],
+			boneInverses: []
+		};
+
+		data.uuid = this.uuid;
+
+		const bones = this.bones;
+		const boneInverses = this.boneInverses;
+
+		for ( let i = 0, l = bones.length; i < l; i ++ ) {
+
+			const bone = bones[ i ];
+			data.bones.push( bone.uuid );
+
+			const boneInverse = boneInverses[ i ];
+			data.boneInverses.push( boneInverse.toArray() );
+
+		}
+
+		return data;
 
 	}
 

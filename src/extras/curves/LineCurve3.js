@@ -1,40 +1,81 @@
-import { Vector3 } from '../../math/Vector3';
-import { Curve } from '../core/Curve';
+import { Vector3 } from '../../math/Vector3.js';
+import { Curve } from '../core/Curve.js';
 
-var LineCurve3;
+function LineCurve3( v1 = new Vector3(), v2 = new Vector3() ) {
 
-/**************************************************************
- *	Line3D
- **************************************************************/
+	Curve.call( this );
 
-LineCurve3 = Curve.create(
+	this.type = 'LineCurve3';
 
-	function ( v1, v2 ) {
+	this.v1 = v1;
+	this.v2 = v2;
 
-		this.v1 = v1;
-		this.v2 = v2;
+}
 
-	},
+LineCurve3.prototype = Object.create( Curve.prototype );
+LineCurve3.prototype.constructor = LineCurve3;
 
-	function ( t ) {
+LineCurve3.prototype.isLineCurve3 = true;
 
-		if ( t === 1 ) {
+LineCurve3.prototype.getPoint = function ( t, optionalTarget = new Vector3() ) {
 
-			return this.v2.clone();
+	const point = optionalTarget;
 
-		}
+	if ( t === 1 ) {
 
-		var vector = new Vector3();
+		point.copy( this.v2 );
 
-		vector.subVectors( this.v2, this.v1 ); // diff
-		vector.multiplyScalar( t );
-		vector.add( this.v1 );
+	} else {
 
-		return vector;
+		point.copy( this.v2 ).sub( this.v1 );
+		point.multiplyScalar( t ).add( this.v1 );
 
 	}
 
-);
+	return point;
+
+};
+
+// Line curve is linear, so we can overwrite default getPointAt
+
+LineCurve3.prototype.getPointAt = function ( u, optionalTarget ) {
+
+	return this.getPoint( u, optionalTarget );
+
+};
+
+LineCurve3.prototype.copy = function ( source ) {
+
+	Curve.prototype.copy.call( this, source );
+
+	this.v1.copy( source.v1 );
+	this.v2.copy( source.v2 );
+
+	return this;
+
+};
+
+LineCurve3.prototype.toJSON = function () {
+
+	const data = Curve.prototype.toJSON.call( this );
+
+	data.v1 = this.v1.toArray();
+	data.v2 = this.v2.toArray();
+
+	return data;
+
+};
+
+LineCurve3.prototype.fromJSON = function ( json ) {
+
+	Curve.prototype.fromJSON.call( this, json );
+
+	this.v1.fromArray( json.v1 );
+	this.v2.fromArray( json.v2 );
+
+	return this;
+
+};
 
 
 export { LineCurve3 };

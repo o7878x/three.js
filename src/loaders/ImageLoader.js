@@ -1,75 +1,83 @@
-import { XHRLoader } from './XHRLoader';
-import { DefaultLoadingManager } from './LoadingManager';
-
-/**
- * @author mrdoob / http://mrdoob.com/
- */
+import { Cache } from './Cache.js';
+import { Loader } from './Loader.js';
 
 function ImageLoader( manager ) {
 
-	this.manager = ( manager !== undefined ) ? manager : DefaultLoadingManager;
+	Loader.call( this, manager );
 
 }
 
-Object.assign( ImageLoader.prototype, {
+ImageLoader.prototype = Object.assign( Object.create( Loader.prototype ), {
+
+	constructor: ImageLoader,
 
 	load: function ( url, onLoad, onProgress, onError ) {
 
-		var scope = this;
+		if ( this.path !== undefined ) url = this.path + url;
 
-		var image = document.createElementNS( 'http://www.w3.org/1999/xhtml', 'img' );
-		image.onload = function () {
+		url = this.manager.resolveURL( url );
 
-			URL.revokeObjectURL( image.src );
+		const scope = this;
 
-			if ( onLoad ) onLoad( image );
+		const cached = Cache.get( url );
+
+		if ( cached !== undefined ) {
+
+			scope.manager.itemStart( url );
+
+			setTimeout( function () {
+
+				if ( onLoad ) onLoad( cached );
+
+				scope.manager.itemEnd( url );
+
+			}, 0 );
+
+			return cached;
+
+		}
+
+		const image = document.createElementNS( 'http://www.w3.org/1999/xhtml', 'img' );
+
+		function onImageLoad() {
+
+			image.removeEventListener( 'load', onImageLoad, false );
+			image.removeEventListener( 'error', onImageError, false );
+
+			Cache.add( url, this );
+
+			if ( onLoad ) onLoad( this );
 
 			scope.manager.itemEnd( url );
 
-		};
+		}
 
-		if ( url.indexOf( 'data:' ) === 0 ) {
+		function onImageError( event ) {
 
-			image.src = url;
+			image.removeEventListener( 'load', onImageLoad, false );
+			image.removeEventListener( 'error', onImageError, false );
 
-		} else {
+			if ( onError ) onError( event );
 
-			var loader = new XHRLoader();
-			loader.setPath( this.path );
-			loader.setResponseType( 'blob' );
-			loader.setWithCredentials( this.withCredentials );
-			loader.load( url, function ( blob ) {
+			scope.manager.itemError( url );
+			scope.manager.itemEnd( url );
 
-				image.src = URL.createObjectURL( blob );
+		}
 
-			}, onProgress, onError );
+		image.addEventListener( 'load', onImageLoad, false );
+		image.addEventListener( 'error', onImageError, false );
+
+		if ( url.substr( 0, 5 ) !== 'data:' ) {
+
+			if ( this.crossOrigin !== undefined ) image.crossOrigin = this.crossOrigin;
 
 		}
 
 		scope.manager.itemStart( url );
 
+		image.src = url;
+
 		return image;
-
-	},
-
-	setCrossOrigin: function ( value ) {
-
-		this.crossOrigin = value;
-		return this;
-
-	},
-
-	setWithCredentials: function ( value ) {
-
-		this.withCredentials = value;
-		return this;
-
-	},
-
-	setPath: function ( value ) {
-
-		this.path = value;
-		return this;
 
 	}
 
